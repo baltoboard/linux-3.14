@@ -587,6 +587,15 @@ config TOUCHSCREEN_UCB1400
 	  To compile this driver as a module, choose M here: the
 	  module will be called ucb1400_ts.
 
+config TOUCHSCREEN_VGG804808
+	tristate "Evervision VGG8048080 touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have an Evervision VGG8048080 touchscreen.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called vgg804808_ts.
+
 config TOUCHSCREEN_PIXCIR
 	tristate "PIXCIR I2C touchscreens"
 	depends on I2C
