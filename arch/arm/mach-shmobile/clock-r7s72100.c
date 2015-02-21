@@ -272,6 +272,11 @@ static struct clk_lookup lookups[] = {
 	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
 };
 
+void __init r7s72100_extal_clock_set(unsigned long extclk)
+{
+	extal_clk.rate = extclk;
+}
+
 void __init r7s72100_clock_init(void)
 {
 	int k, ret = 0;
