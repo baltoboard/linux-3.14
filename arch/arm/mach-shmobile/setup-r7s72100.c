@@ -49,7 +49,7 @@ static struct resource scif##index##_resources[] = {			\
 //R7S72100_SCIF(0, 0xe8007000, gic_iid(221));	/* Not used */
 //R7S72100_SCIF(1, 0xe8007800, gic_iid(225));	/* Not used */
 R7S72100_SCIF(2, 0xe8008000, gic_iid(229));
-//R7S72100_SCIF(3, 0xe8008800, gic_iid(233));	/* Not used */
+R7S72100_SCIF(3, 0xe8008800, gic_iid(233));
 //R7S72100_SCIF(4, 0xe8009000, gic_iid(237));	/* Not used */
 //R7S72100_SCIF(5, 0xe8009800, gic_iid(241));	/* Not used */
 //R7S72100_SCIF(6, 0xe800a000, gic_iid(245));	/* Not used */
@@ -87,7 +87,7 @@ void __init r7s72100_add_dt_devices(void)
 //	r7s72100_register_scif(0);	/* Not used */
 //	r7s72100_register_scif(1);	/* Not used */
 	r7s72100_register_scif(2);
-//	r7s72100_register_scif(3);	/* Not used */
+	r7s72100_register_scif(3);
 //	r7s72100_register_scif(4);	/* Not used */
 //	r7s72100_register_scif(5);	/* Not used */
 //	r7s72100_register_scif(6);	/* Not used */
