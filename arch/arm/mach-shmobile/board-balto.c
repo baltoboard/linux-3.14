@@ -1314,6 +1314,23 @@ static void __init balto_init_late(void)
 	/* TODO */
 }
 
+#define WTCSR 0
+#define WTCNT 2
+#define WRCSR 4
+static void balto_restart(enum reboot_mode mode, const char *cmd)
+{
+	void *base = ioremap_nocache(0xFCFE0000, 0x10);
+
+	/* Dummy read (must read WRCSR:WOVF at least once before clearing) */
+	*(volatile uint8_t *)(base + WRCSR) = *(uint8_t *)(base + WRCSR);
+
+	*(volatile uint16_t *)(base + WRCSR) = 0xA500;	/* Clear WOVF */
+	*(volatile uint16_t *)(base + WRCSR) = 0x5A5F;	/* Reset Enable */
+	*(volatile uint16_t *)(base + WTCNT) = 0x5A00;	/* Counter to 00 */
+	*(volatile uint16_t *)(base + WTCSR) = 0xA578;	/* Start timer */
+
+	while(1); /* Wait for WDT overflow */
+}
 
 static const char * const balto_compat_dt[] __initconst = {
 	"arrow,balto",
@@ -1326,4 +1343,5 @@ DT_MACHINE_START(BALTO_DT, "balto")
 	.init_late	= balto_init_late,
 	.dt_compat	= balto_compat_dt,
 	.map_io		= rza1_map_io,
+	.restart	= balto_restart,
 MACHINE_END
