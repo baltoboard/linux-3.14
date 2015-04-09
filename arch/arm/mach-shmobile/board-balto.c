@@ -276,7 +276,11 @@ static void vdc5fb_pinmux(struct pfc_pinmux_assign *pf, size_t num)
 
 #define VDC5_LCD0_BPP 16 /* 16bpp or 32bpp */
 #define VDC5_LCD0_FBSIZE (800*480*VDC5_LCD0_BPP/8)
+#ifdef CONFIG_XIP_KERNEL
+#define VDC5_LCD0_FB_ADDR 0	/* allocate at probe */
+#else
 #define VDC5_LCD0_FB_ADDR ((0x20A00000 - VDC5_LCD0_FBSIZE) & PAGE_MASK)	/* Place at end of internal RAM */
+#endif
 
 static const struct resource vdc5fb_lcd0_resources[] __initconst = {
 	DEFINE_RES_MEM_NAMED(0xfcff6000, 0x00002000, "vdc5fb.0: reg"),
@@ -355,7 +359,11 @@ static const struct platform_device_info vdc5fb_lcd0_info __initconst = {
 
 #define VDC5_LVDS_BPP 32 /* 16bpp or 32bpp */
 #define VDC5_LVDS_FBSIZE (800*480*VDC5_LVDS_BPP/8)
+#ifdef CONFIG_XIP_KERNEL
+#define VDC5_LVDS_FB_ADDR 0	/* allocate at probe */
+#else
 #define VDC5_LVDS_FB_ADDR ((0x20A00000 - VDC5_LVDS_FBSIZE) & PAGE_MASK)	/* Place at end of internal RAM */
+#endif
 
 static const struct resource vdc5fb_lvds_resources[] __initconst = {
 	DEFINE_RES_MEM_NAMED(0xfcff6000, 0x00002000, "vdc5fb.0: reg"),
