@@ -46,7 +46,6 @@ enum pfc_direction {
 };
 
 void r7s72100_add_dt_devices(void);
-void r7s72100_extal_clock_set(unsigned long extclk);
 void r7s72100_clock_init(void);
 void r7s72100_init_early(void);
 int r7s72100_pinmux_setup(void);
