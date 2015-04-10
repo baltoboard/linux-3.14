@@ -23,9 +23,9 @@
 #include <linux/platform_device.h>
 #include <linux/sh_eth.h>
 #include <asm/mach/map.h>
-#include <mach/common.h>
-#include <mach/irqs.h>
-#include <mach/r7s72100.h>
+#include "common.h"
+#include "irqs.h"
+#include "r7s72100.h"
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -33,6 +33,7 @@
 #include <linux/spi/sh_spibsc.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
+#include <linux/serial_sci.h>
 #include <linux/i2c.h>
 #include <linux/i2c-riic.h>
 #include <linux/mmc/host.h>
@@ -55,6 +56,8 @@
 #include <sound/sh_scux.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
+#include <linux/irq.h>
+#include <linux/dma-mapping.h>
 #include <linux/leds.h>
 #include <linux/input/vgg804808_ts.h>
 #include <linux/platform_data/gpio_backlight.h>
@@ -199,7 +202,7 @@ static const struct rza1_dma_pdata dma_pdata __initconst = {
 	.slave		= rza1_dma_slaves,
 	.slave_num	= ARRAY_SIZE(rza1_dma_slaves),
 #ifdef CONFIG_XIP_KERNEL
-	.channel_num	= 2,	/* Less channels means less RAM */
+	.channel_num	= 6,	/* Less channels means less RAM (2 for SDHI, 4 for Audio) */
 #else
 	.channel_num	= 16,	/* 16 MAX channels */
 #endif
@@ -766,7 +769,7 @@ static struct mtd_partition qspi_flash_partitions[] __initdata = {
 	{
 		.name		= "qspi_rootfs",
 		.offset		= 0x00800000,
-		.size		= 128 * SZ_1M - 0x00800000,
+		.size		= 64 * SZ_1M - 0x00800000,
 	},
 };
 
@@ -778,7 +781,7 @@ static const struct physmap_flash_data qspi_flash_data __initconst = {
 };
 
 static const struct resource qspi_flash_resources[] __initconst = {
-	DEFINE_RES_MEM(0x18000000, SZ_128M),
+	DEFINE_RES_MEM(0x18000000, SZ_64M),
 };
 
 static const struct platform_device_info qspi_flash_info __initconst = {
@@ -1193,6 +1196,40 @@ static const struct platform_device_info scux_info __initconst = {
 };
 
 
+/* SCIF */
+#define R7S72100_SCIF(index, baseaddr, irq)				\
+static const struct plat_sci_port scif##index##_platform_data = {	\
+	.type		= PORT_SCIF,					\
+	.regtype	= SCIx_SH2_SCIF_FIFODATA_REGTYPE,		\
+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
+	.scscr		= SCSCR_RIE | SCSCR_TIE | SCSCR_RE | SCSCR_TE |	\
+			  SCSCR_REIE,					\
+};									\
+									\
+static struct resource scif##index##_resources[] = {			\
+	DEFINE_RES_MEM(baseaddr, 0x100),				\
+	DEFINE_RES_IRQ(irq + 1),					\
+	DEFINE_RES_IRQ(irq + 2),					\
+	DEFINE_RES_IRQ(irq + 3),					\
+	DEFINE_RES_IRQ(irq),						\
+}									\
+
+//R7S72100_SCIF(0, 0xe8007000, gic_iid(221));	/* Not used */
+//R7S72100_SCIF(1, 0xe8007800, gic_iid(225));	/* Not used */
+//R7S72100_SCIF(2, 0xe8008000, gic_iid(229));	/* Not used */
+R7S72100_SCIF(3, 0xe8008800, gic_iid(233));
+//R7S72100_SCIF(4, 0xe8009000, gic_iid(237));	/* Not used */
+//R7S72100_SCIF(5, 0xe8009800, gic_iid(241));	/* Not used */
+//R7S72100_SCIF(6, 0xe800a000, gic_iid(245));	/* Not used */
+//R7S72100_SCIF(7, 0xe800a800, gic_iid(249));	/* Not used */
+
+#define r7s72100_register_scif(index)					       \
+	platform_device_register_resndata(&platform_bus, "sh-sci", index,      \
+					  scif##index##_resources,	       \
+					  ARRAY_SIZE(scif##index##_resources), \
+					  &scif##index##_platform_data,	       \
+					  sizeof(scif##index##_platform_data))
+
 static void __init balto_add_standard_devices(void)
 {
 	struct platform_device *vdc5fb_dev = NULL;
@@ -1207,7 +1244,6 @@ static void __init balto_add_standard_devices(void)
 	l2x0_init(IOMEM(0xfffee000), 0x00000000, 0xffffffff);	/* Leave as defaults */
 #endif
 #endif
-	r7s72100_extal_clock_set(EXTCLK);
 	r7s72100_clock_init();
 	r7s72100_pinmux_setup();
 	r7s72100_add_dt_devices();
@@ -1315,6 +1351,15 @@ static void __init balto_add_standard_devices(void)
 	spi_register_board_info(balto_spi_devices,
 				ARRAY_SIZE(balto_spi_devices));
 
+//	r7s72100_register_scif(0);	/* Not used */
+//	r7s72100_register_scif(1);	/* Not used */
+//	r7s72100_register_scif(2);	/* Not used */
+	r7s72100_register_scif(3);
+//	r7s72100_register_scif(4);	/* Not used */
+//	r7s72100_register_scif(5);	/* Not used */
+//	r7s72100_register_scif(6);	/* Not used */
+//	r7s72100_register_scif(7);	/* Not used */
+
 }
 
 static void __init balto_init_late(void)
@@ -1340,13 +1385,24 @@ static void balto_restart(enum reboot_mode mode, const char *cmd)
 	while(1); /* Wait for WDT overflow */
 }
 
+static void __init balto_init_early(void)
+{
+	shmobile_init_delay();
+
+#ifdef CONFIG_XIP_KERNEL
+	/* Set the size of our pre-allocated DMA buffer pool because the
+	   default is 256KB */
+	init_dma_coherent_pool_size(16 * SZ_1K);
+#endif
+}
+
 static const char * const balto_compat_dt[] __initconst = {
 	"arrow,balto",
 	NULL,
 };
 
 DT_MACHINE_START(BALTO_DT, "balto")
-	.init_early	= r7s72100_init_early,
+	.init_early	= balto_init_early,
 	.init_machine	= balto_add_standard_devices,
 	.init_late	= balto_init_late,
 	.dt_compat	= balto_compat_dt,
