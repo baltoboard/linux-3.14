@@ -58,6 +58,7 @@
 #include <linux/kthread.h>
 #include <linux/irq.h>
 #include <linux/dma-mapping.h>
+#include <linux/clk.h>
 #include <linux/leds.h>
 #include <linux/input/vgg804808_ts.h>
 #include <linux/platform_data/gpio_backlight.h>
@@ -1233,6 +1234,7 @@ R7S72100_SCIF(3, 0xe8008800, gic_iid(233));
 static void __init balto_add_standard_devices(void)
 {
 	struct platform_device *vdc5fb_dev = NULL;
+	struct clk *clk;
 
 #ifdef CONFIG_CACHE_L2X0
 	/* Early BRESP enable, 16K*8way(defualt) */
@@ -1247,6 +1249,13 @@ static void __init balto_add_standard_devices(void)
 	r7s72100_clock_init();
 	r7s72100_pinmux_setup();
 	r7s72100_add_dt_devices();
+
+	/* set extal clock to 66.25 MHz */
+	clk = clk_get(NULL, "extal");
+	if (!IS_ERR(clk)) {
+		clk_set_rate(clk, EXTCLK);
+		clk_put(clk);
+	}
 
 	r7s72100_pfc_pin_assign(P1_0, ALT1, DIIO_PBDC_EN);	/* I2C SCL0 */
 	r7s72100_pfc_pin_assign(P1_1, ALT1, DIIO_PBDC_EN);	/* I2C SDA0 */
