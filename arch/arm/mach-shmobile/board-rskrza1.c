@@ -57,8 +57,13 @@
 #include <sound/sh_scux.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
+#include <media/sh_mobile_ceu.h>
+#include <media/soc_camera.h>
+#include <media/soc_camera_platform.h>
+#include <media/ov7670.h>
 #include <linux/irq.h>
 #include <linux/dma-mapping.h>
+#include <linux/can/platform/rza1_can.h>
 
 /* Board Options */
 //#define RSPI_TESTING	/* Uncomment for RSPI4 enabled on CN15 */
@@ -1076,6 +1081,50 @@ static const struct platform_device_info r8a66597_usb_gadget1_info __initconst =
 	.num_res	= ARRAY_SIZE(r8a66597_usb_gadget1_resources),
 };
 
+#ifdef CONFIG_CAN_RZA1
+static struct resource rz_can_resources[] = {
+	[0] = {
+		.start	= 0xe803a000,
+		.end	= 0xe803b813,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= 258,
+		.end	= 258,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[2] = {
+		.start	= 260,
+		.end	= 260,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[3] = {
+		.start	= 259,
+		.end	= 259,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[4] = {
+		.start	= 253,
+		.end	= 253,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct rz_can_platform_data rz_can_data = {
+	.channel	= 1,
+	.clock_select	= CLKR_CLKC,
+};
+
+static struct platform_device_info rz_can_device = {
+	.name		= "rz_can",
+	.id		= 1,
+	.num_res	= ARRAY_SIZE(rz_can_resources),
+	.res		= rz_can_resources,
+	.data		= &rz_can_data,
+	.size_data	= sizeof(rz_can_data),
+};
+#endif /* CONFIG_CAN_RZA1 */
+
 /* Write to I2C device */
 /* stolen from board-sx1.c */
 int rza1_i2c_write_byte(u8 ch, u8 devaddr, u8 regoffset, u8 value)
@@ -1273,6 +1322,12 @@ struct irq_res const irq_keep_list[] __initconst = {
 //	{241, 4},	/* SCIF5 */
 //	{245, 4},	/* SCIF6 */
 //	{249, 4},	/* SCIF7 */
+//	{253, 2},	/* CAN GERR/GRECC */
+//	{255, 3},	/* CAN0 */
+//	{258, 3},	/* CAN1 */
+//	{261, 3},	/* CAN2 */
+//	{264, 3},	/* CAN3 */
+//	{267, 3},	/* CAN4 */
 //	{270, 3},	/* RSPI0 */
 //	{273, 3},	/* RSPI1 */
 //	{276, 3},	/* RSPI2 */
@@ -1357,6 +1412,113 @@ R7S72100_SCIF(2, 0xe8008000, gic_iid(229));
 					  &scif##index##_platform_data,	       \
 					  sizeof(scif##index##_platform_data))
 
+/* OV7670 */
+static struct ov7670_config ov7670_config = {
+	.min_width =		320,	/* Filter out smaller sizes */
+	.min_height =		160,	/* Filter out smaller sizes */
+	.clock_speed =		0,	/* External clock speed (MHz) */
+	.use_smbus =		0,	/* Use smbus I/O instead of I2C */
+	.pll_bypass =		0,	/* Choose whether to bypass the PLL */
+	.pclk_hb_disable =	0,	/* Disable toggling pixclk during horizontal blanking */
+};
+
+static struct i2c_board_info ceu_camera = {
+	I2C_BOARD_INFO("ov7670", 0x21),
+};
+
+static struct soc_camera_link ceu_iclink = {
+	.bus_id = 0,
+	.board_info = &ceu_camera,
+	.i2c_adapter_id = 0,
+	.priv = &ov7670_config,
+};
+
+static const struct platform_device_info ceu_camera_info __initconst = {
+	.name = "soc-camera-pdrv",
+	.id = 0,
+	.data = &ceu_iclink,
+	.size_data = sizeof(ceu_iclink),
+};
+
+/* CEU */
+static struct sh_mobile_ceu_info sh_mobile_ceu_info = {
+	.flags = SH_CEU_FLAG_USE_8BIT_BUS,
+	.max_width = 1280,
+	.max_height = 768,
+};
+
+static struct resource ceu_resources[] = {
+	[0] = {
+		.name	= "CEU",
+		.start	= 0xE8210000,
+		.end	= 0xE821000f,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start  = gic_iid(364),
+		.flags  = IORESOURCE_IRQ,
+	},
+#ifdef CONFIG_XIP_KERNEL
+	/* CEU Requires dedicated memory when in XIP mode, as there's not enough continguous
+	 * memory for the buffers. You must also specify mem=8M on the kernel command line */
+	[2] = {
+		.name	= "CEU Buffer",
+		.start	= 0x20800000,
+		.end	= 0x20A00000,
+		.flags	= IORESOURCE_MEM,
+	},
+#endif
+};
+
+static const struct platform_device_info ceu_info __initconst = {
+	.name		= "sh_mobile_ceu",
+	.id		= 0,
+	.res		= ceu_resources,
+	.num_res	= ARRAY_SIZE(ceu_resources),
+	.data		= &sh_mobile_ceu_info,
+	.size_data	= sizeof(sh_mobile_ceu_info),
+	.dma_mask	= DMA_BIT_MASK(32),
+};
+
+static struct pfc_pinmux_assign ceu_common[] = {
+	{ P11_11, ALT1, },	/* VIO_D23 */
+	{ P11_10, ALT1, },	/* VIO_D22 */
+	{ P11_9,  ALT1, },	/* VIO_D21 */
+	{ P11_8,  ALT1, },	/* VIO_D20 */
+	{ P11_7,  ALT1, },	/* VIO_D19 */
+	{ P11_6,  ALT1, },	/* VIO_D18 */
+	{ P11_5,  ALT1, },	/* VIO_D17 */
+	{ P11_4,  ALT1, },	/* VIO_D16 */
+	{ P11_3,  ALT6, },	/* VIO_D15 */
+	{ P11_2,  ALT6, },	/* VIO_D14 */
+	{ P11_1,  ALT6, },	/* VIO_D13 */
+	{ P11_0,  ALT6, },	/* VIO_D12 */
+	{ P10_15, ALT6, },	/* VIO_D11 */
+	{ P10_14, ALT6, },	/* VIO_D10 */
+	{ P10_13, ALT6, },	/* VIO_D9 */
+	{ P10_12, ALT6, },	/* VIO_D8 */
+	{ P10_11, ALT6, },	/* VIO_D7 */
+	{ P10_10, ALT6, },	/* VIO_D6 */
+	{ P10_9,  ALT6, },	/* VIO_D5 */
+	{ P10_8,  ALT6, },	/* VIO_D4 */
+	{ P10_7,  ALT6, },	/* VIO_D3 */
+	{ P10_6,  ALT6, },	/* VIO_D2 */
+	{ P10_5,  ALT6, },	/* VIO_D1 */
+	{ P10_4,  ALT6, },	/* VIO_D0 */
+	{ P10_3,  ALT6, },	/* VIO_DFLD */
+	{ P10_2,  ALT6, },	/* VIO_DHD */
+	{ P10_1,  ALT6, },	/* VIO_DVD */
+	{ P10_0,  ALT6, },	/* VIO_CLK */
+};
+
+static void ceu_pinmux(void)
+{
+	size_t n;
+
+	for (n = 0; n < ARRAY_SIZE(ceu_common); n++)
+		r7s72100_pfc_pin_assign(ceu_common[n].port, ceu_common[n].mode, DIIO_PBDC_EN);
+}
+
 static void __init rskrza1_add_standard_devices(void)
 {
 #ifdef CONFIG_CACHE_L2X0
@@ -1410,6 +1572,18 @@ static void __init rskrza1_add_standard_devices(void)
 #endif
 	gpio_irq_init();
 
+#ifdef CONFIG_CAN_RZA1
+	/* Ch 1 (conflicts with Ethernet, requires resistor change) */
+	r7s72100_pfc_pin_assign(P5_9, ALT5, DIIO_PBDC_DIS);	/* CAN CAN1RX */
+	r7s72100_pfc_pin_assign(P5_10, ALT5, DIIO_PBDC_DIS);	/* CAN CAN1TX */
+
+	/* Ch 2 (conflicts with SDRAM) */
+	//r7s72100_pfc_pin_assign(P7_2, ALT5, DIIO_PBDC_DIS);	/* CAN CAN2RX */
+	//r7s72100_pfc_pin_assign(P7_3, ALT5, DIIO_PBDC_DIS);	/* CAN CAN2TX */
+
+	platform_device_register_full(&rz_can_device);
+#endif
+
 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
 	i2c_register_board_info(3, i2c3_devices, ARRAY_SIZE(i2c3_devices));
 
@@ -1427,6 +1601,13 @@ static void __init rskrza1_add_standard_devices(void)
 //	platform_device_register_full(&riic2_info);	/* Not used */
 	platform_device_register_full(&riic3_info);	/* Port Expander, EEPROM (MAC Addr), Audio Codec */
 	platform_device_register_full(&rtc_info);
+
+#ifndef CONFIG_VIDEO_SH_MOBILE_CEU
+	platform_device_register_full(&vdc5fb_info);
+#else
+	platform_device_register_full(&ceu_info);
+	platform_device_register_full(&ceu_camera_info);
+#endif
 
 #if !defined(CONFIG_XIP_KERNEL) && defined(CONFIG_SPI_SH_SPIBSC)
 	/* Need to disable both spibsc channels if using memory mapped QSPI */
@@ -1450,8 +1631,6 @@ static void __init rskrza1_add_standard_devices(void)
 #else
 	platform_device_register_full(&sdhi1_info);
 #endif
-
-	platform_device_register_full(&vdc5fb_info);
 
 	if (usbgs == 0) {
 		platform_device_register_full(&r8a66597_usb_gadget0_info);
@@ -1545,6 +1724,20 @@ static void __init rskrza1_init_late(void)
 			printk("%s: RSPI4 enabled on CN15\n",__func__);
 		else
 			printk("%s: ERROR: Failed to set pins for RSPI4 usage\n",__func__);
+	}
+#endif
+
+#ifdef CONFIG_VIDEO_SH_MOBILE_CEU
+	{
+		u8 value;
+		/* Set PX1_EN0 to 1 to enable camera and disable LCD */
+		/* PX1_EN0 is controlled through Port Expanders on I2C3 */
+		/* Register address 1 is the Output Control register */
+		rza1_i2c_read_byte(3, 0x21, 0x01, &value);
+		value |= 0x01;	/* bit 1 = H */
+		rza1_i2c_write_byte(3, 0x21, 0x01, value);
+
+		ceu_pinmux();
 	}
 #endif
 
