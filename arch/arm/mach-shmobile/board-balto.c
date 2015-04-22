@@ -58,6 +58,7 @@
 #include <linux/kthread.h>
 #include <linux/irq.h>
 #include <linux/dma-mapping.h>
+#include <linux/can/platform/rza1_can.h>
 #include <linux/clk.h>
 #include <linux/leds.h>
 #include <linux/input/vgg804808_ts.h>
@@ -1100,6 +1101,50 @@ static const struct platform_device_info r8a66597_usb_gadget1_info __initconst =
 	.num_res	= ARRAY_SIZE(r8a66597_usb_gadget1_resources),
 };
 
+#ifdef CONFIG_CAN_RZA1
+static struct resource rz_can0_resources[] = {
+	[0] = {
+		.start	= 0xe803a000,
+		.end	= 0xe803b813,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= 255,
+		.end	= 255,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[2] = {
+		.start	= 257,
+		.end	= 257,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[3] = {
+		.start	= 256,
+		.end	= 256,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[4] = {
+		.start	= 253,
+		.end	= 253,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct rz_can_platform_data rz_can0_data = {
+	.channel	= 0,
+	.clock_select	= CLKR_CLKC,
+};
+
+static struct platform_device_info rz_can_device = {
+	.name		= "rz_can",
+	.id		= 0,
+	.num_res	= ARRAY_SIZE(rz_can0_resources),
+	.res		= rz_can0_resources,
+	.data		= &rz_can0_data,
+	.size_data	= sizeof(rz_can0_data),
+};
+#endif /* CONFIG_CAN_RZA1 */
+
 /* Audio */
 static const struct platform_device_info alsa_soc_info = {
 	.name		= "balto_alsa_soc_platform",
@@ -1281,6 +1326,12 @@ static void __init balto_add_standard_devices(void)
 	r7s72100_pfc_pin_assign(P4_15, ALT3, DIIO_PBDC_EN);	/* SD_D2_0 */
 
 	gpio_irq_init();
+
+#ifdef CONFIG_CAN_RZA1
+	r7s72100_pfc_pin_assign(P9_0, ALT3, DIIO_PBDC_DIS);	/* CAN CAN0TX */
+	r7s72100_pfc_pin_assign(P9_1, ALT3, DIIO_PBDC_DIS);	/* CAN CAN0RX */
+	platform_device_register_full(&rz_can_device);
+#endif
 
 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
 	i2c_register_board_info(2, i2c2_devices, ARRAY_SIZE(i2c2_devices));
