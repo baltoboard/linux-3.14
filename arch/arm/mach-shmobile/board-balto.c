@@ -66,6 +66,8 @@
 
 #define EXTCLK 12500000
 
+#define XIP_KERNEL_WITHOUT_EXTERNAL_RAM (defined(CONFIG_XIP_KERNEL) && (CONFIG_PHYS_OFFSET == 0x20000000))
+
 static int usbgs = -1;
 static int __init early_usbgs(char *str)
 {
@@ -208,7 +210,7 @@ static const struct rza1_dma_slave_config rza1_dma_slaves[] = {
 static const struct rza1_dma_pdata dma_pdata __initconst = {
 	.slave		= rza1_dma_slaves,
 	.slave_num	= ARRAY_SIZE(rza1_dma_slaves),
-#ifdef CONFIG_XIP_KERNEL
+#if XIP_KERNEL_WITHOUT_EXTERNAL_RAM
 	.channel_num	= 6,	/* Less channels means less RAM (2 for SDHI, 4 for Audio) */
 #else
 	.channel_num	= 16,	/* 16 MAX channels */
@@ -286,7 +288,7 @@ static void vdc5fb_pinmux(struct pfc_pinmux_assign *pf, size_t num)
 
 #define VDC5_LCD0_BPP 16 /* 16bpp or 32bpp */
 #define VDC5_LCD0_FBSIZE (800*480*VDC5_LCD0_BPP/8)
-#ifdef CONFIG_XIP_KERNEL
+#if XIP_KERNEL_WITHOUT_EXTERNAL_RAM
 #define VDC5_LCD0_FB_ADDR 0	/* allocate at probe */
 #else
 #define VDC5_LCD0_FB_ADDR ((0x20A00000 - VDC5_LCD0_FBSIZE) & PAGE_MASK)	/* Place at end of internal RAM */
@@ -369,7 +371,7 @@ static const struct platform_device_info vdc5fb_lcd0_info __initconst = {
 
 #define VDC5_LVDS_BPP 32 /* 16bpp or 32bpp */
 #define VDC5_LVDS_FBSIZE (800*480*VDC5_LVDS_BPP/8)
-#ifdef CONFIG_XIP_KERNEL
+#if XIP_KERNEL_WITHOUT_EXTERNAL_RAM
 #define VDC5_LVDS_FB_ADDR 0	/* allocate at probe */
 #else
 #define VDC5_LVDS_FB_ADDR ((0x20A00000 - VDC5_LVDS_FBSIZE) & PAGE_MASK)	/* Place at end of internal RAM */
@@ -477,7 +479,7 @@ static const struct resource jcu_resources[] __initconst = {
 	DEFINE_RES_MEM_NAMED(0x20200000, 0x100000, "jcu:iram"), /* (Non cacheable 1MB) */
 };
 
-#ifndef CONFIG_XIP_KERNEL	/* TODO: Uses too much internal RAM */
+#if (!XIP_KERNEL_WITHOUT_EXTERNAL_RAM)
 static const struct platform_device_info jcu_info __initconst = {
 	.name		= "uio_pdrv_genirq",
 	.id		= 0,
@@ -1343,7 +1345,7 @@ static void __init balto_add_standard_devices(void)
 
 	platform_device_register(&leds_device);
 
-#ifndef CONFIG_XIP_KERNEL	/* TODO: Uses too much internal RAM */
+#if (!XIP_KERNEL_WITHOUT_EXTERNAL_RAM)
 	platform_device_register_full(&jcu_info);
 #endif
 	platform_device_register_full(&ostm_info);
@@ -1454,7 +1456,7 @@ static void __init balto_init_early(void)
 {
 	shmobile_init_delay();
 
-#ifdef CONFIG_XIP_KERNEL
+#if XIP_KERNEL_WITHOUT_EXTERNAL_RAM
 	/* Set the size of our pre-allocated DMA buffer pool because the
 	   default is 256KB */
 	init_dma_coherent_pool_size(16 * SZ_1K);
